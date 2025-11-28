@@ -1,6 +1,6 @@
 local config = {
     PKGNAME = "BSE-Export",
-    VERSION = "0.0.1",
+    VERSIOn = "0.0.2",
 
     -- this is the address towards who we are flooding with DCS data.
     -- usually this should be our middleware that exposes data as a REST API
