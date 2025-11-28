@@ -58,7 +58,7 @@ local BSE = {
 }
 
 function BSE:Start()
-    Logger:info("Starting...")
+    Logger:info("Hook (v ".. config.VERSION ..") Starting...")
     self.udp_sender:Init(self.relay_address.ip, self.relay_address.port)
     Logger:info("Started")
 end
