@@ -33,4 +33,4 @@ jobs:
             dist/BSE-DCS-Hook-${{ github.ref_name}}.lua
        
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BSE_TOKEN }}
