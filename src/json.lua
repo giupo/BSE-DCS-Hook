@@ -9,14 +9,8 @@ local net = net or {
     end
 }
 
-
 function json:dump(obj)
-    local data, err = pcall(function() net.lua2json(obj) end)
-    if err ~= nil then
-	Logger:info("Error dumping JSON data...")
-    end
-
-    return data
+    return net.lua2json(obj)
 end
 
 
