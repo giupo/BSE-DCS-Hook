@@ -12,6 +12,8 @@ function udp:Init(ip, port)
     self.socket = socket.udp()
     self.socket:settimeout(0)
     self.socket:setoption("broadcast", true)
+    self.ip = ip 
+    self.port = port
 end
 
 function udp:Send(data)

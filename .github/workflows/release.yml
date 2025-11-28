@@ -18,10 +18,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install bundler dependencies (se servono)
-        run: |
-          pip install -r requirements.txt || true
-
       - name: Run bundler
         run: |
           mkdir -p dist

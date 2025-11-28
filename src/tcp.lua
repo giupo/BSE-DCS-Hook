@@ -12,6 +12,9 @@ function tcp:init(ip, port)
     self.socket = socket.tcp()
     self.socket:settimeout(0)
     self.socket:setoption("broadcast", true)
+
+    self.ip = ip
+    self.port = port
 end
 
 function tcp:connect()
