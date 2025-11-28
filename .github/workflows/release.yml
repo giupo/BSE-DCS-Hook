@@ -1,0 +1,40 @@
+name: Build and Release Lua Bundle
+
+on:
+  push:
+    tags:
+      - '*'     # attiva per TUTTI i tag (es: v1.0.0, 2.3.1, ecc.)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install bundler dependencies (se servono)
+        run: |
+          pip install -r requirements.txt || true
+
+      - name: Run bundler
+        run: |
+          mkdir -p dist
+          python lua_bundler.py --output dist/BSE-DCS-Hook-${{ github.ref_name }}.lua
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
+          body: "Release automatica generata dal bundler."
+          files: |
+            dist/BSE-DCS-Hook-${{ github.ref_name}}.lua
+       
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
