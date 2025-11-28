@@ -63,6 +63,8 @@ local BSE = {
 function BSE:Start()
     Logger:info("Hook (v ".. config.VERSION ..") Starting...") 
     Logger:info("Started")
+    self.playerid_sent = false
+    self.mission_sent = false
 end
 
 
@@ -100,7 +102,10 @@ end
 
 
 function BSE:UpdatePlayerUnit(threshold)
-    self:UpdateData(threshold, "playerId", DCS.getPlayerUnit())
+    if self.playerid_sent == true then
+        return
+    end
+    self.playerid_sent = self:UpdateData(threshold, "playerId", DCS.getPlayerUnit())
 end
 
 function BSE:UpdatePlayerPosition(threshold)
@@ -108,7 +113,10 @@ function BSE:UpdatePlayerPosition(threshold)
 end
 
 function BSE:UpdateMissionData(threshold)
-    self:UpdateData(threshold, "mission", DCS.getCurrentMission())
+    if self.mission_sent == true then
+        return
+    end
+     self.mission_sent = self:UpdateData(threshold, "mission", DCS.getCurrentMission())
 end
 
 
