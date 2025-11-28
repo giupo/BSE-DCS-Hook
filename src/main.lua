@@ -65,15 +65,28 @@ function BSE:Start()
     Logger:info("Started")
     self.playerid_sent = false
     self.mission_sent = false
+    self.frameCounter = 0
+    self.last_updated = {
+        playerId = 0,
+        position = 0,
+        worldObjects = {},
+        mission = 0
+    }
 end
 
 
 function BSE:Stop()
     if self.udp_sender ~= nil then
-        self.udp_sender:Close()
+        local message = {}
+            message.messageState =  {
+	        missionRunning = false,
+		    missionServerRunning = false,
+	    }
+    
+        self.udp_sender:Send(message)
     end
 
-    Logger:info("closed.")
+    Logger:info("Stopped.")
 end
 
 function BSE:shouldUpdate(last_updated, threshold)
@@ -153,19 +166,35 @@ function BSE:Update()
     self.udp_sender:Update()
 
     Logger:debug("Updating..")
-    
+
     self:UpdatePlayerUnit(0)
     self:UpdatePlayerPosition(30)
     self:UpdateWorldObjects(60)
     self:UpdateMissionData(0)
-    
+   
     Logger:debug("Updated.")
+end
+
+function BSE:onMissionLoadEnd()
+    Logger:info("Mission just ended loading, scheduling resending mission data")
+    BSE.mission_sent = false
+    BSE.playerid_sent = false
+    self.frameCounter = 0
+
+    local message = {}
+    message.messageState =  {
+	    missionRunning = true,
+		missionServerRunning = true,
+	}
+
+    self.udp_sender:Send(message)
 end
 
 DCS.setUserCallbacks({
     onSimulationStart = function() BSE:Start() end,
     onSimulationStop = function() BSE:Stop() end,
-    onSimulationFrame = function() BSE:Update() end
+    onSimulationFrame = function() BSE:Update() end,
+    onMissionLoadEnd = function() BSE:onMissionLoadEnd() end
 })
 
 Logger:info("Registered Callbacks")

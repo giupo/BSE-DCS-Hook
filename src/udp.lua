@@ -42,8 +42,7 @@ function udp:Send(data)
         self.failures = self.failures + 1
         Logger:warning("Rc of UDP:send is nil, something is wrong ..." .. self.failures)
         if err_msg ~= nil then
-            Logger:warning("Cannot send this motherfucker: " .. err_msg)
-            return false
+            Logger:warning("Cannot send this motherfucker: " .. err_msg)            
         end
         self.socket = nil
         return false
