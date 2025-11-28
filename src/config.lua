@@ -9,7 +9,7 @@ local config = {
     -- host where DCS is running.
     
     relay_address = {
-	ip = "127.0.0.1",
+	    ip = "10.17.17.8",
         port = 6666
     },
 

@@ -11,31 +11,31 @@ local config = require("config")
 
 local Export = Export or {
     LoGetSelfData = function()
-	Logger:info("called LoGetSelfData")
-	return {}
+	    Logger:info("called LoGetSelfData")
+	    return {}
     end,
 
     LoGetWorldObjects = function()
-	Logger:info("called LoGetWorldObjects")
-	return{}
+	    Logger:info("called LoGetWorldObjects")
+	    return{}
     end
 }
 
 local DCS = DCS or {
     setUserCallbacks = function(obj)
-	Logger:info("Called setUserCallbacks")
+	    Logger:info("Called setUserCallbacks")
     end,
 
     getCurrentMission = function()
-	Logger:info("Called getCurrentMission")
-	return {}
+	    Logger:info("Called getCurrentMission")
+	    return {}
     end,
 
     getPlayerUnit = function()
-	Logger:info("called getPlayerUnit")
-	return {}
+	    Logger:info("called getPlayerUnit")
+    	return {}
     end,
-    
+
 }
 
 -- Main entry point:
@@ -43,13 +43,16 @@ local DCS = DCS or {
 local BSE = {
     frameCounter = 0,
     relay_address = config.relay_address,
-    
+
     last_updated = {
         playerId = 0,
         position = 0,
         worldObjects = {},
         mission = 0
     },
+
+    mission_sent = false,
+    playerid_sent = false,
 
     max_send_ops = config.max_send_ops,
 
@@ -58,8 +61,7 @@ local BSE = {
 }
 
 function BSE:Start()
-    Logger:info("Hook (v ".. config.VERSION ..") Starting...")
-    self.udp_sender:Init(self.relay_address.ip, self.relay_address.port)
+    Logger:info("Hook (v ".. config.VERSION ..") Starting...") 
     Logger:info("Started")
 end
 
@@ -76,69 +78,79 @@ function BSE:shouldUpdate(last_updated, threshold)
     return self.frameCounter - (last_updated or 0) > threshold
 end
 
+
+-- generic updater used for playerId, position and mission
+function BSE:UpdateData(threshold, what, data)
+    local last_updated = self.last_updated[what]
+    if not self:shouldUpdate(last_updated, threshold) then return end
+
+    if not data then
+        Logger:debug("Data " .. what .." is nil, returning")
+        return
+    end
+
+    Logger:debug("About to send " .. what)
+    local rc = self.udp_sender:Send({
+        [what] = data
+    })
+    self.last_updated[what] = self.frameCounter
+    return rc
+end
+
+
+
 function BSE:UpdatePlayerUnit(threshold)
-    if not self:shouldUpdate(self.last_updated.playerId, threshold) then return end
-    
-    self.udp_sender:Send({
-        playerId = DCS.getPlayerUnit()                
-    })   
-    self.last_updated.playerId = self.frameCounter
+    self:UpdateData(threshold, "playerId", DCS.getPlayerUnit())
 end
 
 function BSE:UpdatePlayerPosition(threshold)
-    if not self:shouldUpdate(self.last_updated.position, threshold) then return end
-    self.udp_sender:Send({
-        position = Export.LoGetSelfData()                
-    })
-    self.last_updated.position = self.frameCounter
+    self:UpdateData(threshold, "position", Export.LoGetSelfData())
 end
 
-function BSE:UpdateWorldObjects(threshold)    
+function BSE:UpdateMissionData(threshold)
+    self:UpdateData(threshold, "mission", DCS.getCurrentMission())
+end
+
+
+-- fairly messy updated for WorldObjects
+function BSE:UpdateWorldObjects(threshold)
     local worldObjects = Export.LoGetWorldObjects()
-    
+    if worldObjects == nil then
+        Logger:info("worldObjects is nil, returning...")
+        return
+    end
+
     for id, unit in pairs(worldObjects) do
         local last_updated = self.last_updated.worldObjects[id] or 0
         if self:shouldUpdate(last_updated, threshold) then
+            local worldObjects = {
+                [id] = unit
+            }
+
+            Logger:info("About to send unit: ".. id)
             self.udp_sender:Send({
-                worldObjects = {
-                    [id] = unit
-                }
+                worldObjects = worldObjects
             })
             self.last_updated.worldObjects[id] = self.frameCounter
         end
 
-        if self.udp_sender.sent_objects > self.max_send_ops then 
+        if self.udp_sender.sent_objects > self.max_send_ops then
             break
-        end    
+        end
     end
-end
-
-function BSE:UpdateMissionData(threshold)
-    if not self:shouldUpdate(self.last_updated.mission, threshold) then return end    
-    self.udp_sender:Send(DCS.getCurrentMission())
-    self.last_updated.mission = self.frameCounter
 end
 
 function BSE:Update()
     self.frameCounter = self.frameCounter + 1
     self.udp_sender:Update()
-    
-    Logger:debug("Updating..")
-  
-    if self.frameCounter == 1 then
-        self:UpdatePlayerUnit(0)
-        self:UpdatePlayerPosition(0)
-        self:UpdateWorldObjects(0)
-        self:UpdateMissionData(0)    
-        Logger:debug("Early update, at first...")
-        return
-    end
 
-    self:UpdatePlayerUnit(512)
+    Logger:debug("Updating..")
+    
+    self:UpdatePlayerUnit(0)
     self:UpdatePlayerPosition(30)
     self:UpdateWorldObjects(60)
-    self:UpdateMissionData(512)
-
+    self:UpdateMissionData(0)
+    
     Logger:debug("Updated.")
 end
 
@@ -147,3 +159,5 @@ DCS.setUserCallbacks({
     onSimulationStop = function() BSE:Stop() end,
     onSimulationFrame = function() BSE:Update() end
 })
+
+Logger:info("Registered Callbacks")
