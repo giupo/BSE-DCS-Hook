@@ -56,8 +56,8 @@ local BSE = {
 
     max_send_ops = config.max_send_ops,
 
-    udp_sender = require("udp")
-    --tcp_sender = require("tcp"),
+    -- sender = require("udp"),
+    sender = require("tcp"),
 }
 
 function BSE:Start()
@@ -76,14 +76,14 @@ end
 
 
 function BSE:Stop()
-    if self.udp_sender ~= nil then
+    if self.sender ~= nil then
         local message = {}
             message.messageState =  {
 	        missionRunning = false,
 		    missionServerRunning = false,
 	    }
     
-        self.udp_sender:Send(message)
+        self.sender:Send(message)
     end
 
     Logger:info("Stopped.")
@@ -105,7 +105,7 @@ function BSE:UpdateData(threshold, what, data)
     end
 
     Logger:debug("About to send " .. what)
-    local rc = self.udp_sender:Send({
+    local rc = self.sender:Send({
         [what] = data
     })
     self.last_updated[what] = self.frameCounter
@@ -149,13 +149,13 @@ function BSE:UpdateWorldObjects(threshold)
             }
 
             Logger:info("About to send unit: ".. id)
-            self.udp_sender:Send({
+            self.sender:Send({
                 worldObjects = worldObjects
             })
             self.last_updated.worldObjects[id] = self.frameCounter
         end
 
-        if self.udp_sender.sent_objects > self.max_send_ops then
+        if self.sender.sent_objects > self.max_send_ops then
             break
         end
     end
@@ -163,7 +163,7 @@ end
 
 function BSE:Update()
     self.frameCounter = self.frameCounter + 1
-    self.udp_sender:Update()
+    self.sender:Update()
 
     Logger:debug("Updating..")
 
@@ -187,7 +187,7 @@ function BSE:onMissionLoadEnd()
 		missionServerRunning = true,
 	}
 
-    self.udp_sender:Send(message)
+    self.sender:Send(message)
 end
 
 DCS.setUserCallbacks({

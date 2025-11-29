@@ -1,15 +1,19 @@
 local Logger = require("logger")
 local json = require("json")
 local config = require("config")
+
+
 local tcp = {
-    connected = false
+    connected = false,
+    sent_objects = 0
 }
 
 function tcp:Init()
     local socket = require("socket")
+    tcp:Close()
     self.socket = socket.tcp()
     self.socket:settimeout(0)
-    self.socket:setoption("broadcast", true)
+    self.sent_objects = 0
 end
 
 function tcp:connect()
@@ -18,23 +22,34 @@ function tcp:connect()
     local ok, err = self.socket:connect(config.relay_address.ip, config.relay_address.port)
     self.connected = ok
 
-    --if not ok and err ~= "timeout" then
-    --    Logger:warning("TCP connect error: " .. tostring(err))
-    --    self.connected = false
-    --end
+    if not ok and err ~= "timeout" then
+        Logger:warning("TCP connect error: " .. err)
+        self.connected = false
+    end
 
     return self.connected
 end
 
 function tcp:Send(data)
-    if self.socket == nil then
-        Logger:warning("Cannot connect, TCP not initizlized")
-        return
+
+    if data == nil or data == {} then
+        Logger:debug("Data is nil or empty, nothing to do here..")
+        return false
     end
 
-    self:connect()
+    if self.socket == nil then
+        Logger:warning("Cannot connect, TCP not initizlized")
+        self:Init()
+    end
 
-    local payload = (data and json:dump(data) or "")
+    if not self:connect() then
+        Logger:warning("Trying to send, but still disconnected, check the server...")
+        return false
+    end
+
+
+
+    local payload = json:dump(data)
     local rc, err_msg = self.socket:send(payload)
 
     if err_msg ~= nil then
@@ -42,7 +57,15 @@ function tcp:Send(data)
         if err_msg == "closed" then
             self.connected = false
         end
+        return false
     end
+
+    Logger:debug("Sent rc: " .. rc)
+    Logger:debug("Payload length: " .. string.len(payload))
+    self.sent_objects = self.sent_objects + 1
+    Logger:debug("Sent objects: ".. self.sent_objects)
+
+    return true
 end
 
 function tcp:Close()
@@ -50,6 +73,10 @@ function tcp:Close()
         self.socket:close()
     end
     self.connected = false
+end
+
+function tcp:Update()
+    self.sent_objects = 0
 end
 
 return tcp
