@@ -50,21 +50,16 @@ local BSE = {
         worldObjects = {},
         mission = 0
     },
-
-    mission_sent = false,
-    playerid_sent = false,
-
+    
     max_send_ops = config.max_send_ops,
 
     -- sender = require("udp"),
     sender = require("tcp"),
 }
 
-function BSE:Start()
+function BSE:onSimulationStart()
     Logger:info("Hook (v ".. config.VERSION ..") Starting...") 
     Logger:info("Started")
-    self.playerid_sent = false
-    self.mission_sent = false
     self.frameCounter = 0
     self.last_updated = {
         playerId = 0,
@@ -75,15 +70,9 @@ function BSE:Start()
 end
 
 
-function BSE:Stop()
+function BSE:onSimulationStop()
     if self.sender ~= nil then
-        local message = {}
-            message.messageState =  {
-	        missionRunning = false,
-		    missionServerRunning = false,
-	    }
-    
-        self.sender:Send(message)
+        self:stopMission()
     end
 
     Logger:info("Stopped.")
@@ -109,6 +98,9 @@ function BSE:UpdateData(threshold, what, data)
         [what] = data
     })
     self.last_updated[what] = self.frameCounter
+
+    -- in case we had problems, i reset player/mission so they get resent...
+    
     return rc
 end
 
@@ -126,10 +118,8 @@ function BSE:UpdatePlayerPosition(threshold)
 end
 
 function BSE:UpdateMissionData(threshold)
-    if self.mission_sent == true then
-        return
-    end
-     self.mission_sent = self:UpdateData(threshold, "mission", DCS.getCurrentMission())
+    self.mission_sent = self:UpdateData(threshold, "mission", DCS.getCurrentMission())
+    self:startMission()
 end
 
 
@@ -144,13 +134,13 @@ function BSE:UpdateWorldObjects(threshold)
     for id, unit in pairs(worldObjects) do
         local last_updated = self.last_updated.worldObjects[id] or 0
         if self:shouldUpdate(last_updated, threshold) then
-            local worldObjects = {
+            local unit_object = {
                 [id] = unit
             }
 
-            Logger:info("About to send unit: ".. id)
+            -- Logger:info("About to send unit: ".. id)
             self.sender:Send({
-                worldObjects = worldObjects
+                worldObjects = unit_object
             })
             self.last_updated.worldObjects[id] = self.frameCounter
         end
@@ -161,40 +151,57 @@ function BSE:UpdateWorldObjects(threshold)
     end
 end
 
-function BSE:Update()
+
+function BSE:onSimulationFrame()
     self.frameCounter = self.frameCounter + 1
     self.sender:Update()
 
     Logger:debug("Updating..")
 
-    self:UpdatePlayerUnit(0)
+    self:UpdatePlayerUnit(1024)
     self:UpdatePlayerPosition(30)
     self:UpdateWorldObjects(60)
-    self:UpdateMissionData(0)
+    self:UpdateMissionData(1024)
    
     Logger:debug("Updated.")
 end
 
 function BSE:onMissionLoadEnd()
     Logger:info("Mission just ended loading, scheduling resending mission data")
-    BSE.mission_sent = false
-    BSE.playerid_sent = false
     self.frameCounter = 0
+    self:UpdatePlayerUnit(0)
+    self:UpdatePlayerPosition(0)
+    self:UpdateWorldObjects(0)
+    self:UpdateMissionData(0)
+end
 
+function BSE:startMission()
+    Logger:info("Send start mission...")
     local message = {}
     message.messageState =  {
 	    missionRunning = true,
 		missionServerRunning = true,
 	}
-
     self.sender:Send(message)
 end
 
+function BSE:stopMission()
+    Logger:info("Send stop mission...")
+    local message = {}
+    message.messageState =  {
+	    missionRunning = false,
+		missionServerRunning = false,
+	}
+    self.sender:Send(message)
+end
+
+
 DCS.setUserCallbacks({
-    onSimulationStart = function() BSE:Start() end,
-    onSimulationStop = function() BSE:Stop() end,
-    onSimulationFrame = function() BSE:Update() end,
+    onSimulationStart = function() BSE:onSimulationStart() end,
+    onSimulationStop = function() BSE:onSimulationStop() end,
+    onSimulationFrame = function() BSE:onSimulationFrame() end,
     onMissionLoadEnd = function() BSE:onMissionLoadEnd() end
 })
 
 Logger:info("Registered Callbacks")
+BSE.sender:Init()
